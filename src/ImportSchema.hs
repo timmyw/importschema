@@ -11,6 +11,8 @@ import qualified Data.ByteString.Char8 as B
 import System.Directory
 import System.IO
 import Data.Time
+import Paths_importschema (version)
+import Data.Version (showVersion)
     
 data ColumnDesc = ColumnDescrip { columnName :: String
                                 , columnHaskellName :: String
@@ -171,7 +173,7 @@ main = do
   let opts = fst allopts
   if hasVersion opts
   then do
-    putStrLn "ImportSchema"
+    putStrLn $ "ImportSchema " ++ (showVersion version)
     exitWith ExitSuccess
   else
       do
