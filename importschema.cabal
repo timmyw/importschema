@@ -1,14 +1,14 @@
 name:                importschema
 version:             0.1.0.0
-synopsis:            Simple project template from stack
+synopsis:            Generates very simple ODBC wrapper functions for ODBC tables.
 description:         Please see README.md
-homepage:            http://github.com/githubuser/importschema#readme
-license:             BSD3
+homepage:            http://github.com/timmyw/importschema#readme
+license:             GPLv2
 license-file:        LICENSE
-author:              Example Author Name
-maintainer:          example@example.com
-copyright:           2010 Author Here
-category:            Web
+author:              Tim Whelan
+maintainer:          tim@zipt.co
+copyright:           2015 Tim Whelan
+category:            Data
 build-type:          Simple
 cabal-version:       >=1.10
 
