@@ -4,7 +4,7 @@ Generates very simple ODBC wrapper functions for ODBC tables.
 
 # Building
 
-~importschema~ is set up to be built with ~stack~.
+`importschema` is set up to be built with `stack`.
 
     stack build
 
