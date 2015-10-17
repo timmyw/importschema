@@ -178,6 +178,8 @@ main = do
   else
       do
         curDateTime <- show `fmap` getCurrentTime
+        let connInfo = getConnInfo opts
+        dbh <- getConnection connInfo
         outF <- case Main.getFile opts of
                  Just f  -> do
                    putStrLn f
@@ -201,7 +203,6 @@ main = do
                        Nothing -> "tblUsers:User:id"
         let tableDetails = map splitTD $ splitOn "," tables
         -- hPutStrLn $ show tableDetails
-        dbh <- getConnection $ getConnInfo opts
         putStrLn "Processing tables..."
         mapM_ (handleTable dbh outF) tableDetails
         hClose outF
