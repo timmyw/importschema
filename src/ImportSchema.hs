@@ -203,7 +203,7 @@ main = do
                        Nothing -> "tblUsers:User:id"
         let tableDetails = map splitTD $ splitOn "," tables
         -- hPutStrLn $ show tableDetails
-        putStrLn "Processing tables..."
+        --putStrLn "Processing tables..."
         mapM_ (handleTable dbh outF) tableDetails
         hClose outF
 

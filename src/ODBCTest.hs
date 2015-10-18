@@ -16,8 +16,7 @@ main = do
         let connString = args !! 0
         putStrLn $ "ODBCTest: " ++ connString
         connection <- connectODBC connString
-        let query = "SELECT count(*) FROM tblUsers"
-        stmt <- prepare connection query
-        rows <- fetchRow stmt
+        xs <- getTables connection
+        putStr $ "tables "++(foldr jn "." xs)++"\n"
         return ()
-    
+           where jn a b = a++" "++b
