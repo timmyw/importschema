@@ -154,7 +154,7 @@ printSavers outF tableName dataName idCol schema = do
           colstr cn = "toSql $ " ++ cn ++ " n\n"
                                                 
 handleTable dbh outF (tableName,dataName, idCol) = do
-  putStrLn tableName
+  --putStrLn tableName
   hPutStrLn outF $ "--------------------------------------------\n-- Schema for '" ++ tableName ++ "' as '" ++ dataName ++ "'"
   hPutStrLn outF $ "\ntableName' = \"" ++ tableName ++ "\""
   sqlSchema <- describeTable dbh tableName

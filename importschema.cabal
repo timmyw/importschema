@@ -1,5 +1,5 @@
 name:                importschema
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Generates very simple ODBC wrapper functions for ODBC tables.
 description:         Please see README.md
 homepage:            http://github.com/timmyw/importschema#readme
