@@ -32,6 +32,7 @@ mapSqlTypeToType SqlBitT = "Integer"
 mapSqlTypeToType SqlTimestampT = "LocalTime"
 mapSqlTypeToType SqlFloatT = "Float"
 mapSqlTypeToType SqlRealT = "Float"
+mapSqlTypeToType SqlTinyIntT = "Integer"
 mapSqlTypeToType t = show t
 
 mapSqlTypeToDefault SqlCharT = "B.pack \"\""
@@ -41,6 +42,7 @@ mapSqlTypeToDefault SqlBitT = "0"
 mapSqlTypeToDefault SqlTimestampT = "LocalTime (ModifiedJulianDay 0) (TimeOfDay 0 0 0)"
 mapSqlTypeToDefault SqlFloatT = "0.0"
 mapSqlTypeToDefault SqlRealT = "0.0"
+mapSqlTypeToDefault SqlTinyIntT = "0"
 mapSqlTypeToDefault t = ""
 
 {- | Create a ColumnDescription, effectively translating a SqlColDesc
@@ -194,10 +196,10 @@ main = do
                    openFile f System.IO.WriteMode
                  Nothing -> return System.IO.stdout
         hPutStrLn outF $ "{-\n Generated on " ++ curDateTime ++ "\n-}"
-        hPutStrLn outF "module Mappings.Generated where\n"
+        hPutStrLn outF $ "module " ++ (getModule opts) ++ " where\n"
         hPutStrLn outF "import Database.HDBC"
         hPutStrLn outF "import Database.HDBC.ODBC"
-        hPutStrLn outF "import Mappings.Mapping"
+        hPutStrLn outF "import Mapping"
         hPutStrLn outF "import Data.List"
         hPutStrLn outF "import Data.Time"
         hPutStrLn outF "import Control.Applicative"
@@ -211,7 +213,7 @@ main = do
         mapM_ (handleTable dbh outF) tableDetails
         hClose outF
 
-data Flag = Verbose | Version | Connection String | Tables String | Output String
+data Flag = Verbose | Version | Connection String | Tables String | Output String | Module String
             deriving Show
 
 options :: [OptDescr Flag]
@@ -221,6 +223,7 @@ options =
     , Option ['c'] ["connection"] (ReqArg Connection "CONN") "Connection name"
     , Option ['o'] ["output"] (ReqArg Output "FILE") "Output filename"
     , Option ['t'] ["tables"] (ReqArg Tables "TABLES") "List of table names"
+    , Option ['m'] ["module"] (ReqArg Module "MODULE") "Module name"
     ]
 
 outp, conn, tables :: Maybe String -> Flag
@@ -242,7 +245,17 @@ fromVersion Version = True
 fromVersion _       = False
 
 hasVersion fs = any fromVersion fs
-                
+
+{- Module command line option -}
+fromModule (Module m) = Just m
+fromModule _          = Nothing
+
+hasModule :: [Flag] -> Bool
+hasModule fs = any (isJust . fromModule) fs
+
+getModule :: [Flag] -> String
+getModule fs = fromMaybe "Mappings.Generated" $ listToMaybe $ mapMaybe fromModule fs
+               
 hasTables :: [Flag] -> Bool
 hasTables fs = any (isJust . fromTables) fs
 getTables :: [Flag] -> Maybe String
@@ -259,4 +272,4 @@ fromConnInfo (Connection c) = Just c
 fromConnInfo _              = Nothing
                               
 getConnInfo fs = fromMaybe "DSN=shop2010m; UID=Bubble; PWD=P34c3d0ff" $ listToMaybe $ mapMaybe fromConnInfo fs
-                 
+
