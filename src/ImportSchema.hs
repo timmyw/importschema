@@ -111,15 +111,19 @@ printInstances outF tableName dataName idCol schema dbType = do
            
 printTableDetails outF tableName dataName idCol schema dbType = do
   hPutStrLn outF $ "\n-- Defaults and column names for " ++ tableName
-  System.IO.hPutStr outF $ "columnNames" ++ dataName ++ " = ["
-  System.IO.hPutStr outF $ concat $ L.intersperse "," $ map (\x -> "\"" ++ (columnName x) ++ "\"") schema
+  hPutStrLn outF $ "columnNames" ++ dataName ++ " :: [String]"
+  hPutStr outF $ "columnNames" ++ dataName ++ " = ["
+  hPutStr outF $ concat $ L.intersperse "," $ map (\x -> "\"" ++ (columnName x) ++ "\"") schema
   hPutStrLn outF "]"
-  System.IO.hPutStr outF $ "updateColumnNames" ++ dataName ++ " = ["
+  --hPutStrLn outF $ "-- idCol:" ++ idCol
+  --hPutStrLn outF $ "--" ++ $ show (not $ compareNoCase "USerID" idCol)
+  hPutStrLn outF $ "\nupdateColumnNames" ++ dataName ++ " :: [String]"
+  hPutStr outF $ "updateColumnNames" ++ dataName ++ " = ["
   hPutStr outF $ concat $ L.intersperse "," $ map (\x -> "\"" ++ x ++ "\"")
-             (filter (\x -> x /= idCol) (map (\x -> columnName x) schema))
+             (filter (\x -> not $ compareNoCase x idCol) (map columnName schema))
   hPutStrLn outF "]"
-  hPutStrLn outF $ "idColumn' = \"" ++ idCol ++ "\""
-  hPutStrLn outF $ "default" ++ dataName ++ " = " ++ dataName ++ "{" ++
+  hPutStrLn outF $ "\nidColumn' :: String\nidColumn' = \"" ++ idCol ++ "\""
+  hPutStrLn outF $ "\ndefault" ++ dataName ++ " :: " ++ dataName ++ "\ndefault" ++ dataName ++ " = " ++ dataName ++ "{" ++
             (concat $ L.intersperse ", " $
                    map (\x -> ((convertColumnName.columnName) x) ++ " = " ++ (columnDefault x)) schema) ++ "}"
             
@@ -140,6 +144,7 @@ getLastIdQuery dbType = case dbType of
                           "MYSQL" -> "SELECT LAST_INSERT_ID()"
                                      
 printSavers outF tableName dataName idCol schema dbType = do
+  hPutStrLn outF $ "saveExistingUser :: IConnection conn => conn -> " ++ dataName ++ " -> IO Integer"
   hPutStrLn outF $ "-- Savers \n\
 \saveExisting" ++ dataName ++ " connection n = \n\
 \    do\n\
@@ -148,16 +153,17 @@ printSavers outF tableName dataName idCol schema dbType = do
 \      run connection query vals\n\
 \      where colSet = concat $ intersperse \",\" $ map (\\x -> x ++ \"=?\") updateColumnNames" ++ dataName ++ "\n"
 
+  hPutStrLn outF $ "saveNewUser :: IConnection conn => conn -> " ++ dataName ++ " -> IO Integer"
   hPutStrLn outF $ "saveNew" ++ dataName ++ " connection n = do\n\
 \  let query = \"INSERT \" ++ tableName' ++ \"(\" ++ colNameSet ++ \") VALUES (\" ++ colParamSet ++ \")\"\n\
-\  run connection query (getColValues n)\n"
+\  run connection query (getColValues n)"
   hPutStrLn outF $ "  run connection \"" ++ (getLastIdQuery dbType) ++ "\" []\n\
 \    where colNameSet = concat $ intersperse \",\" updateColumnNames" ++ dataName ++ "\n\
 \          colParamSet = concat $ intersperse \",\" $ take (length updateColumnNames" ++ dataName ++ ") (repeat \"?\")\n"
 
   hPutStrLn outF $ "getColValues n =\n\
 \    [" ++ concat (L.intersperse "    ," (map colstr columnNames)) ++ "    ]\n"
-
+  --hPutStrLn outF $ "-- " ++ idCol
   hPutStrLn outF $ "getUpdateColValues n =\n\
 \    [" ++ concat (L.intersperse "    ," (map colstr updcolumnNames)) ++ "    ]"
     where updcolumnNames = filter (/= convertColumnName idCol) $ map (convertColumnName.columnName) schema
@@ -167,7 +173,7 @@ printSavers outF tableName dataName idCol schema dbType = do
 handleTable dbh outF dbType (tableName,dataName, idCol)  = do
   --putStrLn tableName
   hPutStrLn outF $ "--------------------------------------------\n-- Schema for '" ++ tableName ++ "' as '" ++ dataName ++ "'"
-  hPutStrLn outF $ "\ntableName' = \"" ++ tableName ++ "\""
+  hPutStrLn outF $ "\ntableName' :: String\ntableName' = \"" ++ tableName ++ "\"\n"
   sqlSchema <- describeTable dbh tableName
   --hPutStrLn outF $ show sqlSchema
   let schema = map createColumn sqlSchema
@@ -222,6 +228,10 @@ main = do
         mapM_ (handleTable dbh outF dbType) tableDetails 
         hClose outF
 
+compareNoCase :: String -> String -> Bool
+compareNoCase l r = map toLower l == map toLower r
+                    
+-- Command line options
 data Flag = Verbose | Version | Connection String | Tables String
           | Output String | Module String
           | DBType String
