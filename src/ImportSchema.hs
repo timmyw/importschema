@@ -30,6 +30,8 @@ mapSqlTypeToType SqlIntegerT = "Integer"
 mapSqlTypeToType SqlBitT = "Integer"
 --mapSqlTypeToType SqlTimestampT = "B.ByteString"
 mapSqlTypeToType SqlTimestampT = "LocalTime"
+mapSqlTypeToType SqlFloatT = "Float"
+mapSqlTypeToType SqlRealT = "Float"
 mapSqlTypeToType t = show t
 
 mapSqlTypeToDefault SqlCharT = "B.pack \"\""
@@ -37,6 +39,8 @@ mapSqlTypeToDefault SqlVarCharT = "B.pack \"\""
 mapSqlTypeToDefault SqlIntegerT = "0"
 mapSqlTypeToDefault SqlBitT = "0"
 mapSqlTypeToDefault SqlTimestampT = "LocalTime (ModifiedJulianDay 0) (TimeOfDay 0 0 0)"
+mapSqlTypeToDefault SqlFloatT = "0.0"
+mapSqlTypeToDefault SqlRealT = "0.0"
 mapSqlTypeToDefault t = ""
 
 {- | Create a ColumnDescription, effectively translating a SqlColDesc
