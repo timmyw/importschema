@@ -30,8 +30,8 @@ mapSqlTypeToType SqlIntegerT = "Integer"
 mapSqlTypeToType SqlBitT = "Integer"
 --mapSqlTypeToType SqlTimestampT = "B.ByteString"
 mapSqlTypeToType SqlTimestampT = "LocalTime"
-mapSqlTypeToType SqlFloatT = "Float"
-mapSqlTypeToType SqlRealT = "Float"
+mapSqlTypeToType SqlFloatT = "Double"
+mapSqlTypeToType SqlRealT = "Double"
 mapSqlTypeToType SqlTinyIntT = "Integer"
 mapSqlTypeToType t = show t
 
@@ -79,7 +79,7 @@ printSchemaData :: Handle -> String -> String -> String -> [ColumnDesc] -> IO ()
 printSchemaData outF tableName dataName _ schema = do
   hPutStrLn outF $ "data " ++ dataName ++ " = " ++ dataName ++ " { "
   let cols = map (\s -> (columnHaskellName s) ++ " :: " ++ columnTypeString s) schema
-  mapM_ (hPutStrLn outF) $ map (\x -> "\t" ++ x) $ head cols : (map (\x -> "," ++ x) (tail cols))
+  mapM_ (hPutStrLn outF) $ map (\x -> "    " ++ x) $ head cols : (map (\x -> "," ++ x) (tail cols))
   hPutStrLn outF "} deriving (Show,Eq)"
 
 {-| Produce a tuple containing either the supplied table and data type
@@ -118,7 +118,7 @@ printTableDetails outF tableName dataName idCol schema = do
   hPutStr outF $ concat $ L.intersperse "," $ map (\x -> "\"" ++ x ++ "\"")
              (filter (\x -> x /= idCol) (map (\x -> columnName x) schema))
   hPutStrLn outF "]"
-  hPutStrLn outF $ "idColumn' = \"" ++ idCol ++ "\""
+  hPutStrLn outF $ "idColumn' = \"" ++ (convertColumnName idCol) ++ "\""
   hPutStrLn outF $ "default" ++ dataName ++ " = " ++ dataName ++ "{" ++
             (concat $ L.intersperse ", " $
                    map (\x -> ((convertColumnName.columnName) x) ++ " = " ++ (columnDefault x)) schema) ++ "}"
