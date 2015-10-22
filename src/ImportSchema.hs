@@ -75,8 +75,8 @@ convertColumnName' (x: xs) flag =
         where lx = toLower x
               under = if flag || x == '_' then "" else "_"
 
-printSchemaData :: Handle -> String -> String -> String -> [ColumnDesc] -> IO ()
-printSchemaData outF tableName dataName _ schema = do
+printSchemaData :: Handle -> String -> String -> String -> [ColumnDesc] -> String -> IO ()
+printSchemaData outF tableName dataName _ schema dbType = do
   hPutStrLn outF $ "data " ++ dataName ++ " = " ++ dataName ++ " { "
   let cols = map (\s -> (columnHaskellName s) ++ " :: " ++ columnTypeString s) schema
   mapM_ (hPutStrLn outF) $ map (\x -> "    " ++ x) $ head cols : (map (\x -> "," ++ x) (tail cols))
@@ -98,7 +98,7 @@ splitTD td = case
       tds = B.split ':' tdp
 
 --printInstances :: String -> String -> Str
-printInstances outF tableName dataName idCol schema = do
+printInstances outF tableName dataName idCol schema dbType = do
   mapM_ (hPutStrLn  outF) [ "\ninstance DBMapping " ++ dataName ++ " where "
                           , "    idColumn _   = idColumn'"
                           , "    tableName _  = tableName'"
@@ -109,7 +109,7 @@ printInstances outF tableName dataName idCol schema = do
                           , ""
                           ]
            
-printTableDetails outF tableName dataName idCol schema = do
+printTableDetails outF tableName dataName idCol schema dbType = do
   hPutStrLn outF $ "\n-- Defaults and column names for " ++ tableName
   System.IO.hPutStr outF $ "columnNames" ++ dataName ++ " = ["
   System.IO.hPutStr outF $ concat $ L.intersperse "," $ map (\x -> "\"" ++ (columnName x) ++ "\"") schema
@@ -118,13 +118,13 @@ printTableDetails outF tableName dataName idCol schema = do
   hPutStr outF $ concat $ L.intersperse "," $ map (\x -> "\"" ++ x ++ "\"")
              (filter (\x -> x /= idCol) (map (\x -> columnName x) schema))
   hPutStrLn outF "]"
-  hPutStrLn outF $ "idColumn' = \"" ++ (convertColumnName idCol) ++ "\""
+  hPutStrLn outF $ "idColumn' = \"" ++ idCol ++ "\""
   hPutStrLn outF $ "default" ++ dataName ++ " = " ++ dataName ++ "{" ++
             (concat $ L.intersperse ", " $
                    map (\x -> ((convertColumnName.columnName) x) ++ " = " ++ (columnDefault x)) schema) ++ "}"
             
 
-printHelperFunctions outF tableName dataName idCol schema = do
+printHelperFunctions outF tableName dataName idCol schema dbType = do
   hPutStrLn outF $ "find" ++ dataName ++ " connection id' = do"
   hPutStrLn outF $ "   row <- findRowIO connection tableName' idColumn' id'"
   hPutStrLn outF $ "   return $ populate" ++ dataName ++ " row"
@@ -134,7 +134,12 @@ printHelperFunctions outF tableName dataName idCol schema = do
   hPutStrLn outF $ concat $  map (\c -> "  (fromSql $ getColValueFromRow \"" ++ (columnName c) ++ "\" row)\n") schema
   hPutStrLn outF ""
 
-printSavers outF tableName dataName idCol schema = do
+getLastIdQuery :: String -> String
+getLastIdQuery dbType = case dbType of
+                          "MSSQL" -> "SELECT @@ID"
+                          "MYSQL" -> "SELECT LAST_INSERT_ID()"
+                                     
+printSavers outF tableName dataName idCol schema dbType = do
   hPutStrLn outF $ "-- Savers \n\
 \saveExisting" ++ dataName ++ " connection n = \n\
 \    do\n\
@@ -145,8 +150,8 @@ printSavers outF tableName dataName idCol schema = do
 
   hPutStrLn outF $ "saveNew" ++ dataName ++ " connection n = do\n\
 \  let query = \"INSERT \" ++ tableName' ++ \"(\" ++ colNameSet ++ \") VALUES (\" ++ colParamSet ++ \")\"\n\
-\  run connection query (getColValues n)\n\
-\  run connection \"SELECT @@ID\" []\n\
+\  run connection query (getColValues n)\n"
+  hPutStrLn outF $ "  run connection \"" ++ (getLastIdQuery dbType) ++ "\" []\n\
 \    where colNameSet = concat $ intersperse \",\" updateColumnNames" ++ dataName ++ "\n\
 \          colParamSet = concat $ intersperse \",\" $ take (length updateColumnNames" ++ dataName ++ ") (repeat \"?\")\n"
 
@@ -159,14 +164,14 @@ printSavers outF tableName dataName idCol schema = do
           columnNames = map (convertColumnName.columnName) schema
           colstr cn = "toSql $ " ++ cn ++ " n\n"
                                                 
-handleTable dbh outF (tableName,dataName, idCol) = do
+handleTable dbh outF dbType (tableName,dataName, idCol)  = do
   --putStrLn tableName
   hPutStrLn outF $ "--------------------------------------------\n-- Schema for '" ++ tableName ++ "' as '" ++ dataName ++ "'"
   hPutStrLn outF $ "\ntableName' = \"" ++ tableName ++ "\""
   sqlSchema <- describeTable dbh tableName
   --hPutStrLn outF $ show sqlSchema
   let schema = map createColumn sqlSchema
-  mapM_ (\x -> x outF tableName dataName idCol schema)
+  mapM_ (\f -> f outF tableName dataName idCol schema dbType)
             [ printSchemaData, printTableDetails
             , printInstances, printHelperFunctions
             , printSavers]
@@ -195,7 +200,11 @@ main = do
                    else return  ()
                    openFile f System.IO.WriteMode
                  Nothing -> return System.IO.stdout
-        hPutStrLn outF $ "{-\n Generated on " ++ curDateTime ++ "\n-}"
+        let dbType = getDBType opts
+        hPutStrLn outF $ "{-\n Generated on " ++ curDateTime ++ "\n"
+        hPutStrLn outF $ "  Connection info:" ++ connInfo ++ "\n"
+        hPutStrLn outF $ "  Database type  :" ++ dbType ++ "\n"
+        hPutStrLn outF $ "-}\n"
         hPutStrLn outF $ "module " ++ (getModule opts) ++ " where\n"
         hPutStrLn outF "import Database.HDBC"
         hPutStrLn outF "import Database.HDBC.ODBC"
@@ -210,10 +219,12 @@ main = do
         let tableDetails = map splitTD $ splitOn "," tables
         -- hPutStrLn $ show tableDetails
         --putStrLn "Processing tables..."
-        mapM_ (handleTable dbh outF) tableDetails
+        mapM_ (handleTable dbh outF dbType) tableDetails 
         hClose outF
 
-data Flag = Verbose | Version | Connection String | Tables String | Output String | Module String
+data Flag = Verbose | Version | Connection String | Tables String
+          | Output String | Module String
+          | DBType String
             deriving Show
 
 options :: [OptDescr Flag]
@@ -224,6 +235,7 @@ options =
     , Option ['o'] ["output"] (ReqArg Output "FILE") "Output filename"
     , Option ['t'] ["tables"] (ReqArg Tables "TABLES") "List of table names"
     , Option ['m'] ["module"] (ReqArg Module "MODULE") "Module name"
+    , Option ['d'] ["dbty[e"] (ReqArg DBType "DBTYPE") "Underlying Database type [MSSQL|MYSQL]"
     ]
 
 outp, conn, tables :: Maybe String -> Flag
@@ -255,6 +267,13 @@ hasModule fs = any (isJust . fromModule) fs
 
 getModule :: [Flag] -> String
 getModule fs = fromMaybe "Mappings.Generated" $ listToMaybe $ mapMaybe fromModule fs
+
+-- DBType
+fromDBType (DBType d) = Just d
+fromDBType _          = Nothing
+
+getDBType :: [Flag] -> String
+getDBType fs = fromMaybe "MYSQL" $ listToMaybe $ mapMaybe fromDBType fs
                
 hasTables :: [Flag] -> Bool
 hasTables fs = any (isJust . fromTables) fs

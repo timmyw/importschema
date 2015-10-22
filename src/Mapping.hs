@@ -33,6 +33,9 @@ class DBMapping n where
      -- | The identity column name
      idColumn :: n -> String
 
+     -- | Underlying database type
+     --dbType :: n -> String
+               
      -- | Save a row
      save :: Connection -> n -> IO Integer
      save connection n = do
