@@ -51,7 +51,7 @@ mapSqlTypeToDefault t = ""
 createColumn :: (String, SqlColDesc) -> ColumnDesc
 createColumn (name, desc) =
     ColumnDescrip name
-                  (convertColumnName name)
+                  ((checkIdName.convertColumnName) name)
                   (colType desc) ((mapSqlTypeToType . colType) desc)
                   size
                   (mapSqlTypeToDefault $ colType desc)
@@ -59,8 +59,16 @@ createColumn (name, desc) =
            Nothing -> 0
            Just x  -> x
 
+checkIdName :: String -> String
+checkIdName n 
+    | n == "id" = "id'"
+    | otherwise = n
+
 convertColumnName :: String -> String
-convertColumnName n =
+convertColumnName = checkIdName.convertColumnName''
+                    
+convertColumnName'' :: String -> String
+convertColumnName'' n =
     if firstChar == '_'
     then tail nx
     else nx
@@ -75,8 +83,8 @@ convertColumnName' (x: xs) flag =
         where lx = toLower x
               under = if flag || x == '_' then "" else "_"
 
-printSchemaData :: Handle -> String -> String -> String -> [ColumnDesc] -> String -> IO ()
-printSchemaData outF tableName dataName _ schema dbType = do
+printSchemaData :: Handle -> String -> String -> String -> [ColumnDesc] -> String -> String -> IO ()
+printSchemaData outF tableName dataName _ schema dbType modName = do
   hPutStrLn outF $ "data " ++ dataName ++ " = " ++ dataName ++ " { "
   let cols = map (\s -> (columnHaskellName s) ++ " :: " ++ columnTypeString s) schema
   mapM_ (hPutStrLn outF) $ map (\x -> "    " ++ x) $ head cols : (map (\x -> "," ++ x) (tail cols))
@@ -98,18 +106,18 @@ splitTD td = case
       tds = B.split ':' tdp
 
 --printInstances :: String -> String -> Str
-printInstances outF tableName dataName idCol schema dbType = do
+printInstances outF tableName dataName idCol schema dbType modName = do
   mapM_ (hPutStrLn  outF) [ "\ninstance DBMapping " ++ dataName ++ " where "
                           , "    idColumn _   = idColumn'"
                           , "    tableName _  = tableName'"
                           , "    mappingFind  = find" ++ dataName
-                          , "    getId n      = " ++ (convertColumnName idCol) ++ " n"
+                          , "    getId n      = " ++ modName ++ "." ++ (convertColumnName idCol) ++ " n"
                           , "    saveExisting = saveExisting" ++ dataName
                           , "    saveNew      = saveNew" ++ dataName
                           , ""
                           ]
            
-printTableDetails outF tableName dataName idCol schema dbType = do
+printTableDetails outF tableName dataName idCol schema dbType modName = do
   hPutStrLn outF $ "\n-- Defaults and column names for " ++ tableName
   hPutStrLn outF $ "columnNames" ++ dataName ++ " :: [String]"
   hPutStr outF $ "columnNames" ++ dataName ++ " = ["
@@ -125,10 +133,10 @@ printTableDetails outF tableName dataName idCol schema dbType = do
   hPutStrLn outF $ "\nidColumn' :: String\nidColumn' = \"" ++ idCol ++ "\""
   hPutStrLn outF $ "\ndefault" ++ dataName ++ " :: " ++ dataName ++ "\ndefault" ++ dataName ++ " = " ++ dataName ++ "{" ++
             (concat $ L.intersperse ", " $
-                   map (\x -> ((convertColumnName.columnName) x) ++ " = " ++ (columnDefault x)) schema) ++ "}"
-            
+                   map (\x -> modName ++ "." ++ ((columnHaskellName) x) ++ " = " ++ (columnDefault x)) schema) ++ "}"
 
-printHelperFunctions outF tableName dataName idCol schema dbType = do
+
+printHelperFunctions outF tableName dataName idCol schema dbType modName = do
   hPutStrLn outF $ "find" ++ dataName ++ " connection id' = do"
   hPutStrLn outF $ "   row <- findRowIO connection tableName' idColumn' id'"
   hPutStrLn outF $ "   return $ populate" ++ dataName ++ " row"
@@ -143,7 +151,7 @@ getLastIdQuery dbType = case dbType of
                           "MSSQL" -> "SELECT @@ID"
                           "MYSQL" -> "SELECT LAST_INSERT_ID()"
                                      
-printSavers outF tableName dataName idCol schema dbType = do
+printSavers outF tableName dataName idCol schema dbType modName = do
   hPutStrLn outF $ "saveExistingUser :: IConnection conn => conn -> " ++ dataName ++ " -> IO Integer"
   hPutStrLn outF $ "-- Savers \n\
 \saveExisting" ++ dataName ++ " connection n = \n\
@@ -170,14 +178,15 @@ printSavers outF tableName dataName idCol schema dbType = do
           columnNames = map (convertColumnName.columnName) schema
           colstr cn = "toSql $ " ++ cn ++ " n\n"
                                                 
-handleTable dbh outF dbType (tableName,dataName, idCol)  = do
+handleTable dbh outF dbType modName (tableName,dataName, idCol)  = do
   --putStrLn tableName
   hPutStrLn outF $ "--------------------------------------------\n-- Schema for '" ++ tableName ++ "' as '" ++ dataName ++ "'"
   hPutStrLn outF $ "\ntableName' :: String\ntableName' = \"" ++ tableName ++ "\"\n"
   sqlSchema <- describeTable dbh tableName
   --hPutStrLn outF $ show sqlSchema
   let schema = map createColumn sqlSchema
-  mapM_ (\f -> f outF tableName dataName idCol schema dbType)
+  -- putStrLn $ "-- SCHEMA:" ++ (show schema)
+  mapM_ (\f -> f outF tableName dataName idCol schema dbType modName)
             [ printSchemaData, printTableDetails
             , printInstances, printHelperFunctions
             , printSavers]
@@ -207,11 +216,12 @@ main = do
                    openFile f System.IO.WriteMode
                  Nothing -> return System.IO.stdout
         let dbType = getDBType opts
+        let modName = getModule opts
         hPutStrLn outF $ "{-\n Generated on " ++ curDateTime ++ "\n"
         hPutStrLn outF $ "  Connection info:" ++ connInfo ++ "\n"
         hPutStrLn outF $ "  Database type  :" ++ dbType ++ "\n"
         hPutStrLn outF $ "-}\n"
-        hPutStrLn outF $ "module " ++ (getModule opts) ++ " where\n"
+        hPutStrLn outF $ "module " ++ modName ++ " where\n"
         hPutStrLn outF "import Database.HDBC"
         hPutStrLn outF "import Database.HDBC.ODBC"
         hPutStrLn outF "import Mapping"
@@ -225,7 +235,7 @@ main = do
         let tableDetails = map splitTD $ splitOn "," tables
         -- hPutStrLn $ show tableDetails
         --putStrLn "Processing tables..."
-        mapM_ (handleTable dbh outF dbType) tableDetails 
+        mapM_ (handleTable dbh outF dbType modName) tableDetails 
         hClose outF
 
 compareNoCase :: String -> String -> Bool
