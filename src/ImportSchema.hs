@@ -164,15 +164,15 @@ printSavers outF tableName dataName idCol schema dbType modName = do
   hPutStrLn outF $ "saveNewUser :: IConnection conn => conn -> " ++ dataName ++ " -> IO Integer"
   hPutStrLn outF $ "saveNew" ++ dataName ++ " connection n = do\n\
 \  let query = \"INSERT \" ++ tableName' ++ \"(\" ++ colNameSet ++ \") VALUES (\" ++ colParamSet ++ \")\"\n\
-\  run connection query (getColValues n)"
+\  _ <- run connection query (getUpdateColValues n)"
   hPutStrLn outF $ "  run connection \"" ++ (getLastIdQuery dbType) ++ "\" []\n\
 \    where colNameSet = concat $ intersperse \",\" updateColumnNames" ++ dataName ++ "\n\
 \          colParamSet = concat $ intersperse \",\" $ take (length updateColumnNames" ++ dataName ++ ") (repeat \"?\")\n"
 
-  hPutStrLn outF $ "getColValues n =\n\
+  hPutStrLn outF $ "getColValues :: " ++ dataName ++ " -> [SqlValue]\ngetColValues n =\n\
 \    [" ++ concat (L.intersperse "    ," (map colstr columnNames)) ++ "    ]\n"
   --hPutStrLn outF $ "-- " ++ idCol
-  hPutStrLn outF $ "getUpdateColValues n =\n\
+  hPutStrLn outF $ "getUpdateColValues :: " ++ dataName ++ " -> [SqlValue]\ngetUpdateColValues n =\n\
 \    [" ++ concat (L.intersperse "    ," (map colstr updcolumnNames)) ++ "    ]"
     where updcolumnNames = filter (/= convertColumnName idCol) $ map (convertColumnName.columnName) schema
           columnNames = map (convertColumnName.columnName) schema

@@ -1,6 +1,7 @@
 flags: {}
 packages:
 - '.'
+- /home/timmy/code/lapputils
 extra-deps:
 - HDBC-2.4.0.1
 - HDBC-odbc-2.4.0.1

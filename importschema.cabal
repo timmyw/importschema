@@ -1,5 +1,5 @@
 name:                importschema
-version:             0.1.0.4
+version:             0.1.0.5
 synopsis:            Generates very simple ODBC wrapper functions for ODBC tables.
 description:         Please see README.md
 homepage:            http://github.com/timmyw/importschema#readme
@@ -16,7 +16,7 @@ executable importschema
   hs-source-dirs:      src
   main-is:             ImportSchema.hs
   default-language:    Haskell2010
-  other-modules:       LappDriver, Mapping, Paths_importschema
+  other-modules:       LappDriver, Paths_importschema
   build-depends:       base >= 4.7 && < 5
                      , HDBC
                      , HDBC-odbc
@@ -24,6 +24,7 @@ executable importschema
                      , directory
                      , split
                      , bytestring
+                     , lapputils
 
 executable odbctest
   hs-source-dirs:      src
